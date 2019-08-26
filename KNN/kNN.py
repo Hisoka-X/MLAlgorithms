@@ -1,13 +1,27 @@
+"""
+    k-近邻算法
+"""
 import operator
 
-from numpy import array, tile, ndarray, matrix
+from numpy import array, tile, ndarray, matrix, zeros
 
 from Common.Util import show_scatter
 
 
-def creat_dataset():
-    group = array([[1.0, 1.1], [1.0, 1.0], [0, 0], [0, 0.1]])
-    labels = ['A', 'A', 'B', 'B']
+def creat_dataset(file_name):
+    # group = array([[1.0, 1.1], [1.0, 1.0], [0, 0], [0, 0.1]])
+    # labels = ['A', 'A', 'B', 'B']
+    fr = open(file_name)
+    lines = fr.readlines()
+    number_of_lines = len(lines)
+    group = zeros((number_of_lines, 3))
+    index = 0
+    labels = []
+    for line in lines:
+        keys = line.strip().split('\t')
+        group[index, :] = keys[0:3]
+        labels.append(keys[-1])
+        index += 1
     return group, labels
 
 
@@ -41,13 +55,38 @@ def classify(inx: list, dataset: ndarray, labels, k):
     return sorted_class_count[0][0]
 
 
+def norm_dataset(dataset):
+    """
+        长度归一化 减少属性本身数据大小特征的差异
+    :param dataset:
+    :return:
+    """
+    min_data = dataset.min(0)
+    max_data = dataset.max(0)
+    ranges = max_data - min_data
+    # 数据集行数量
+    m = dataset.shape[0]
+    # 归一化公式：new_value = (old_value-min)/(max-min)
+    # 生成dataset相同大小的矩阵
+    norm_data = dataset - tile(min_data, (m, 1))
+    norm_data = norm_data / tile(ranges, (m, 1))
+
+    return norm_data, ranges, min_data
+
+
 def run():
+    # 测试数据
+    test = [1, 0.8, 1]
     # 加载数据
-    group, labels = creat_dataset()
+    group, labels = creat_dataset('datingTestSet2.txt')
+    # 数据归一化
+    group, ranges, min_data = norm_dataset(group)
     # 展示数据散点图
-    show_scatter(group[:, 0], group[:, 1])
+    show_scatter(group[:, 0], group[:, 1], labels)
+    # 对测试数据进行归一化
+    test = (array(test) - min_data) / ranges
     # 获取输出向量对应的标签
-    print(str(classify([1, 0.8], group, labels, 3)))
+    print(str(classify(test, group, labels, 3)))
 
 
 if __name__ == '__main__':
