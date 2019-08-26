@@ -5,7 +5,7 @@ import operator
 
 from numpy import array, tile, ndarray, matrix, zeros
 
-from Common.Util import show_scatter
+from common.util import show_scatter
 
 
 def creat_dataset(file_name):
