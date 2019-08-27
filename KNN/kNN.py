@@ -21,6 +21,8 @@ def creat_dataset(file_name):
         keys = line.strip().split('\t')
         group[index, :] = keys[0:3]
         labels.append(keys[-1])
+        # 如果需要显示散点图 就需要对str进行int化
+        # labels.append(int(keys[-1]))
         index += 1
     return group, labels
 
