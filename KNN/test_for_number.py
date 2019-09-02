@@ -8,12 +8,6 @@ from numpy import zeros
 from KNN.kNN import classify
 
 
-def get_matrix():
-    """
-        解析数据返回矩阵和标签
-    """
-
-
 def img_2_vector(file_name):
     """
         将一个文件表示的数据存入向量中
