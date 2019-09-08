@@ -41,7 +41,9 @@ def get_words_in_vocab(vocab_list: list, words_list):
     words_matrix = zeros(words_length)
     for word in words_list:
         if word in vocab_list:
-            words_matrix[vocab_list.index(word)] = 1
+            # 这里有两种模型可以选择 一种是对单词出现次数不敏感 一种是对单词出现次数敏感 次数越高权重越高
+            # words_matrix[vocab_list.index(word)] = 1
+            words_matrix[vocab_list.index(word)] += 1
     return words_matrix
 
 
@@ -76,7 +78,7 @@ def train_naive_bayes(train_matrix, labels):
 
 def classify_data(need_classify_data, label0_words_probability, label1_words_probability, label0_probability):
     """
-        对数据进行分率 利用贝叶斯准则 p(c|x,y)=p(x,y|c)p(c)/p(x,y)
+        对数据进行分类 利用贝叶斯准则 p(c|x,y)=p(x,y|c)p(c)/p(x,y)
     """
     # 因为概率为1和概率为0计算所用分母 p(x,y) 都是一样的 不影响比较结果 所以可以不计算
     # python中对数据小的数据相乘 最后可能四舍五入为0 这里利用代数公式 ln(a*b)=ln(a)+ln(b) 可以将乘法转换为加法 避免这种情况
