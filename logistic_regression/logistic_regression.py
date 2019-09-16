@@ -1,7 +1,11 @@
 """
     逻辑回归算法
 """
-from numpy import mat, shape, ones, exp
+import random
+
+from numpy import mat, shape, ones, exp, sum
+
+from common.util import plot_best_fit, plot_wave
 
 
 def get_dataset():
@@ -22,6 +26,7 @@ def sigmoid(x):
 
 def grad_ascent(dataset, labels):
     """
+        批量梯度上升
         逻辑：
             1. 通过sigmoid函数 1/(1/epx(-z)) 将数据取值规范到0-1之间，其中z=w0*x0+w1*x1+w2*x2+...+wn*xn
             2. 通过似然函数（似然函数的值越高，代表利用此时最高位对应的系数得到的sigmoid函数计算出的值概率和理想概率最接近）
@@ -54,10 +59,44 @@ def grad_ascent(dataset, labels):
     return weights
 
 
+def random_grad_ascent(dataset, labels, num_iter=150):
+    """
+        随机梯度上升 返回系数回归过程
+    """
+    dataset_matrix = mat(dataset)
+    # dataset_matrix = dataset
+    m, n = shape(dataset_matrix)
+    weights = ones((n, 1))
+    data1_result = []
+    data2_result = []
+    data3_result = []
+    for time in range(num_iter):
+        data_index = list(range(m))
+        for i in range(m):
+            # 每次迭代减少步长 缓解数据波动
+            alpha = 4 / (1.0 + time + i) + 0.01
+            # 每次随机选择样本数据进行更新回归系数 减少周期性的波动
+            random_index = random.randint(0, len(data_index) - 1)
+            h = sigmoid(sum(dataset_matrix[random_index] * weights))
+            error = labels[random_index] - h
+            weights += (alpha * error * dataset_matrix[random_index]).transpose()
+            del data_index[random_index]
+        data1_result.append([time, weights[0, 0]])
+        data2_result.append([time, weights[1, 0]])
+        data3_result.append([time, weights[2, 0]])
+    return data1_result, data2_result, data3_result
+
+
 def run():
     dataset, labels = get_dataset()
-    weights = grad_ascent(dataset, labels)
-    print(str(weights))
+    # weights = grad_ascent(dataset, labels)
+    # print(str(weights))
+    # plot_best_fit(dataset, labels, weights)
+
+    result1, result2, result3 = random_grad_ascent(dataset, labels, 4000)
+    plot_wave(result1)
+    plot_wave(result2)
+    plot_wave(result3)
 
 
 if __name__ == '__main__':
