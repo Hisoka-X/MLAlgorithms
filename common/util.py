@@ -1,5 +1,5 @@
 from matplotlib import pyplot
-from numpy import array
+from numpy import array, shape, arange
 
 decision_node = dict(boxstyle='sawtooth', fc='0.8')
 leaf_node = dict(boxstyle='round4', fc='0.8')
@@ -27,6 +27,48 @@ def plot_node(node_txt, center_pt, parent_pt, node_type):
     create_plot.ax1.annotate(node_txt, xy=parent_pt, xycoords='axes fraction', xytext=center_pt,
                              textcoords='axes fraction', va='center', ha='center', bbox=node_type,
                              arrowprops=arrow_args)
+
+
+def plot_best_fit(data_matrix, labels, weights):
+    """
+        画出决策边界
+    """
+    data_array = array(data_matrix)
+    n = shape(data_array)[0]
+    x_cord1 = []
+    y_cord1 = []
+    x_cord2 = []
+    y_cord2 = []
+    for i in range(n):
+        if labels[i] == 1:
+            x_cord1.append(data_array[i, 1])
+            y_cord1.append(data_array[i, 2])
+        else:
+            x_cord2.append(data_array[i, 1])
+            y_cord2.append(data_array[i, 2])
+    ax = pyplot.figure().add_subplot(111)
+    ax.scatter(x_cord1, y_cord1, s=30, c='red', marker='s')
+    ax.scatter(x_cord2, y_cord2, s=30, c='green')
+    # 生成数组 间距为0.1
+    x = arange(-3.0, 3.0, 0.1)
+    # 公式通过z=w0*x0+w1*x1+w2*x2+...+wn*xn转换得到 在系数固定的情况下得到x1和x2的关系函数
+    y = (-weights[0] - weights[1] * x) / weights[2]
+    ax.plot(x, y)
+    pyplot.xlabel('X1')
+    pyplot.ylabel('X2')
+    pyplot.show()
+
+
+def plot_wave(data):
+    """
+        画出波动图
+    """
+    data_array = array(data)
+    ax = pyplot.figure().add_subplot(111)
+    ax.plot(data_array[:, 0], data_array[:, 1])
+    pyplot.xlabel('times')
+    pyplot.xlabel('index')
+    pyplot.show()
 
 
 # def create_plot():
@@ -115,7 +157,6 @@ def create_plot(tree):
     plot_tree.y_off = 1.0
     plot_tree(tree, (0.5, 1.0), '')
     pyplot.show()
-
 
 # if __name__ == '__main__':
 #     mytree = {'flippers': {0: 'no', 1: {'no surfacing': {0: 'no', 1: 'yes'}}}}
