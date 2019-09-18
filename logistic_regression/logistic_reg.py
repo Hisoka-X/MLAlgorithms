@@ -24,6 +24,14 @@ def sigmoid(x):
     return 1.0 / (1 + exp(-x))
 
 
+def classify(data, weights):
+    result = sigmoid(sum(data * weights))
+    if result > 0.5:
+        return 1
+    else:
+        return 0
+
+
 def grad_ascent(dataset, labels):
     """
         批量梯度上升
@@ -74,17 +82,18 @@ def random_grad_ascent(dataset, labels, num_iter=150):
         data_index = list(range(m))
         for i in range(m):
             # 每次迭代减少步长 缓解数据波动
-            alpha = 4 / (1.0 + time + i) + 0.01
+            alpha = 4 / (1.0 + time + i) + 0.0001
             # 每次随机选择样本数据进行更新回归系数 减少周期性的波动
             random_index = random.randint(0, len(data_index) - 1)
-            h = sigmoid(sum(dataset_matrix[random_index] * weights))
-            error = labels[random_index] - h
-            weights += (alpha * error * dataset_matrix[random_index]).transpose()
+            index = data_index[random_index]
+            h = sigmoid(sum(dataset_matrix[index] * weights))
+            error = labels[index] - h
+            weights += (alpha * error * dataset_matrix[index]).transpose()
             del data_index[random_index]
         data1_result.append([time, weights[0, 0]])
         data2_result.append([time, weights[1, 0]])
         data3_result.append([time, weights[2, 0]])
-    return data1_result, data2_result, data3_result
+    return data1_result, data2_result, data3_result, weights
 
 
 def run():
@@ -93,7 +102,8 @@ def run():
     # print(str(weights))
     # plot_best_fit(dataset, labels, weights)
 
-    result1, result2, result3 = random_grad_ascent(dataset, labels, 4000)
+    result1, result2, result3, weights = random_grad_ascent(dataset, labels, 150)
+    plot_best_fit(dataset, labels, weights)
     plot_wave(result1)
     plot_wave(result2)
     plot_wave(result3)
