@@ -1,172 +1,157 @@
 """
-    SMO算法 序列最小化算法
+    序列最小化算法 完整版
 """
-import random
+from numpy import shape, multiply, nonzero, mat, array
+from numpy.matlib import zeros
 
-from matplotlib import pyplot
-from matplotlib.axes import Axes
-from matplotlib.patches import Circle
-from numpy import mat, shape, zeros, multiply, arange, ndarray
-from numpy.ma import array
+from support_vector_machine.smo_simple import select_j_rand, clip_alpha, load_data_set, plot_scatter
 
 
-def load_data_set(file_name):
+class OptStruct:
     """
-        数据集加载
+        保存重要的值 只是作为一个保存数据的对象
     """
-    data_matrix = []
-    label_matrix = []
-    for line in open(file_name).readlines():
-        line_attr = line.strip().split('\t')
-        data_matrix.append([float(line_attr[0]), float(line_attr[1])])
-        label_matrix.append(float(line_attr[2]))
-    return data_matrix, label_matrix
+
+    def __init__(self, data_matrix, labels, c, toler):
+        self.data_matrix = data_matrix
+        self.label_matrix = labels
+        self.c = c
+        self.toler = toler
+        self.m = shape(data_matrix)[0]
+        self.alphas = zeros((self.m, 1))
+        self.b = 0
+        self.e_cache = zeros((self.m, 2))  # 缓存E的值 第一列表示E是否有效 第二列保存对应的值 有效意味着已经计算好了
 
 
-def select_j_rand(i: int, m: int):
+def smo_complete(data_matrix, labels, c, toler, max_iter=500, ):
     """
-        在m范围内选择一个不等于i的值
+        完整版smo 序列最小化算法 循环模块
     """
-    j = i
-    while j == i:
-        j = random.randint(0, m - 1)
-    return j
-
-
-def clip_alpha(a, h, l):
-    """
-        调整alpha的值 保证其在范围内
-    :param a: alpha值
-    :param h: 允许最大值
-    :param l: 允许最小值y76
-    :return: 调整后的值
-    """
-    if a > h:
-        return h
-    if a < l:
-        return l
-    return a
-
-
-def smo_simple(data_matrix, label_matrix, c, toler, max_iter_times=500):
-    """
-        简化版序列最小化算法 简化了每次数据参数向量的选择 直接采用随机的方式选择进行优化的参数
-        c表示惩罚参数 toler表示软间隔最大化中的松弛参数
-    """
-    # 数据格式转换
-    data_matrix = mat(data_matrix)
-    label_matrix = mat(label_matrix).transpose()
-    # 利用数据行数生成对应行数的系数alpha 初始化都为0
-    m, n = shape(data_matrix)
-    alphas = mat(zeros((m, 1)))
+    os = OptStruct(mat(data_matrix), mat(labels).transpose(), c, toler)
     iter_times = 0
-    # 截距
-    b = 0
-    # 在最大允许迭代次数之内进行计算
-    while iter_times < max_iter_times:
-        alpha_changed = False
-        # 遍历所有数据 然后对对应的的alpha参数进行计算
-        for i in range(m):
-            # 计算出当前预测函数计算出的实际值 然后和理想值进行比对 获取差值用于计算新的alpha参数值
-            # 这里的T表示转置 通过这种方式实现两个向量的点乘
-            fxi = float(multiply(alphas, label_matrix).T * (data_matrix * data_matrix[i, :].T)) + b
-            ei = fxi - float(label_matrix[i])
-            # 通过kkt条件得到的支持向量 支持向量必须满足0<=alpha<=c 选择违反kkt条件的向量进行对应的alpha优化
-            if ((label_matrix[i] * ei < -toler) and (alphas[i] < c)) or (
-                    (label_matrix[i] * ei > toler) and (alphas[i] > 0)):
-                # 随机选择第二个alpha变量 这就是简化版的原因 在第二个alpha变量选择上简单化
-                j = select_j_rand(i, m)
-                fxj = float(multiply(alphas, label_matrix).T * (data_matrix * data_matrix[j, :].T)) + b
-                ej = fxj - float(label_matrix[j])
-                # 取出改变前的数据 重新分配内存地址 用于比较
-                alpha_old_i = alphas[i].copy()
-                alpha_old_j = alphas[j].copy()
-                # 通过二变量优化问题得到a1和a2的关系 然后得出l和h的取值
-                if label_matrix[i] != label_matrix[j]:
-                    limit_l = max(0, alphas[j] - alphas[i])
-                    limit_h = min(c, c + alphas[j] - alphas[i])
-                else:
-                    limit_l = max(0, alphas[j] + alphas[i] - c)
-                    limit_h = min(c, alphas[j] + alphas[i])
-                # 相等说明alpha取值只能是一个值 不符合kkt条件
-                if limit_h == limit_l:
-                    print('L==H')
-                    continue
-                # 计算分母 K11+K22-2K12=||f1-f2||² K为核函数(这里没有使用核函数 直接使用两个向量的点乘) f为映射函数
-                eta = (data_matrix[i, :] * data_matrix[i, :].T + data_matrix[j, :] * data_matrix[j, :].T
-                       - 2.0 * data_matrix[i, :] * data_matrix[j, :].T)
-                if eta <= 0:
-                    continue
-                alphas[j] += label_matrix[j] * (ei - ej) / eta
-                alphas[j] = clip_alpha(alphas[j], limit_h, limit_l)
-                # 检查更新后的alpha值是否精度足够
-                if abs(alphas[j] - alpha_old_j) < 0.00001:
-                    print('j not moving enough')
-                    continue
-                # 因为a1y1+a2y2=k k为常数 通过其他alpha向量和对应的标签值得到 所以可以通过a2的改变量得到a1需要改变的量
-                alphas[i] -= label_matrix[i] * label_matrix[j] * (alphas[j] - alpha_old_j)
-                # 得到alphas的值后 可以通过函数得到对应的b的值
-                # 然后根据alpha值的大小 是否在0<alpha<c或者alpha=0或者alpha=c来进行b值的选取
-                b1 = (-ei - label_matrix[i] * (alphas[i] - alpha_old_i) * data_matrix[i, :] * data_matrix[i, :].T -
-                      label_matrix[j] * (alphas[j] - alpha_old_j) * data_matrix[i, :] * data_matrix[j, :].T + b)
-                b2 = (-ej - label_matrix[i] * (alphas[i] - alpha_old_i) * data_matrix[i, :] * data_matrix[j, :].T -
-                      label_matrix[j] * (alphas[j] - alpha_old_j) * data_matrix[j, :] * data_matrix[j, :].T + b)
-                if (0 < alphas[i]) and (c > alphas[i]):
-                    b = b1
-                elif (0 < alphas[j]) and (c > alphas[j]):
-                    b = b2
-                else:
-                    b = (b1 + b2) / 2
-                alpha_changed = True
-                print('iter: %d i:%d alpha_changed %s' % (iter_times, i, alpha_changed))
-        if alpha_changed:
-            # 如果向量发生更新 所有数据重新遍历计算
-            # 需要保证数据在重复max_iter_times次之后依然alpha向量没有更新 这就是趋于稳定
-            iter_times = 0
-        else:
+    alpha_pairs_changed = 0
+    entire_set = True  # 表示是否为全alpha遍历
+    # 这里的退出条件为循环次数超过最大值 或者 遍历了整个alpha也没有发生改变
+    while iter_times < max_iter and (alpha_pairs_changed > 0 or entire_set):
+        alpha_pairs_changed = 0
+        if entire_set:
+            for i in range(os.m):
+                alpha_pairs_changed += inner_l(i, os)
+                print('fullSet, iter: %d i:%d, pairs changed %d' % (iter_times, i, alpha_pairs_changed))
             iter_times += 1
-        print('iteration number: %d' % iter_times)
-    return alphas, b[0, 0]
-
-
-def plot_scatter(data_matrix, label_matrix, alphas, b, w):
-    """
-        画出散点图和支持向量和平面
-    """
-    label1_x = []
-    label2_x = []
-    label1_y = []
-    label2_y = []
-    ax: Axes = pyplot.figure().add_subplot(111)
-    for i in range(len(data_matrix)):
-        if label_matrix[i] == 1:
-            label1_x.append(data_matrix[i, 0])
-            label1_y.append(data_matrix[i, 1])
         else:
-            label2_x.append(data_matrix[i, 0])
-            label2_y.append(data_matrix[i, 1])
-        # 对支持向量做特别标注
-        if alphas[i] > 0:
-            circle = Circle((data_matrix[i, 0], data_matrix[i, 1]), radius=0.5, facecolor='none',
-                            edgecolor=(0, 0.8, 0.8),
-                            linewidth=3, alpha=0.5)
-            ax.add_patch(circle)
-    ax.scatter(label1_x, label1_y, s=30, c='red', marker='s')
-    ax.scatter(label2_x, label2_y, s=30, c='green', marker='o')
-    x = arange(-2.0, 8.0, 0.1)
-    # 通过W·X+b=0得到x1和x2的关系 得出x2也就是y
-    w0 = w[0, 0]
-    w1 = w[0, 1]
-    y = (-b - w0 * x) / w1
-    ax.plot(x, y)
-    pyplot.xlabel('x1')
-    pyplot.ylabel('x2')
-    pyplot.show()
+            # 遍历非边界值
+            non_bound_i = nonzero((os.alphas.A > 0) * (os.alphas.A < c))[0]
+            for i in non_bound_i:
+                alpha_pairs_changed += inner_l(i, os)
+                print('non-bound, iter: %d i:%d, pairs changed %d' % (iter_times, i, alpha_pairs_changed))
+            iter_times += 1
+        if entire_set:
+            entire_set = False
+        elif alpha_pairs_changed == 0:
+            entire_set = True
+        print('iteration number %d' % iter_times)
+    return os.b, os.alphas
+
+
+def inner_l(i, os: OptStruct):
+    """
+        完整版 smo 序列最小化算法 计算模块 包含一次alpha优化 注释见smo_simple.py
+    """
+    ei = calc_e(os, i)
+    if ((os.label_matrix[i] * ei < -os.toler) and (os.alphas[i] < os.c)) or \
+            ((os.label_matrix[i] * ei > os.toler) and (os.alphas[i] > 0)):
+        j, ej = select_j(i, os, ei)
+        alpha_old_i = os.alphas[i].copy()
+        alpha_old_j = os.alphas[j].copy()
+        if os.label_matrix[i] != os.label_matrix[j]:
+            limit_l = max(0, os.alphas[j] - os.alphas[i])
+            limit_h = min(os.c, os.c + os.alphas[j] - os.alphas[i])
+        else:
+            limit_l = max(0, os.alphas[j] + os.alphas[i] - os.c)
+            limit_h = min(os.c, os.alphas[j] + os.alphas[i])
+        if limit_l == limit_h:
+            print('L==H')
+            return 0
+        eta = (os.data_matrix[i, :] * os.data_matrix[i, :].T + os.data_matrix[j, :] * os.data_matrix[j, :].T
+               - 2.0 * os.data_matrix[i, :] * os.data_matrix[j, :].T)
+        if eta <= 0:
+            print('eta<=0')
+            return 0
+        os.alphas[j] += os.label_matrix[j] * (ei - ej) / eta
+        os.alphas[j] = clip_alpha(os.alphas[j], limit_h, limit_l)
+        update_e(os, j)
+        if abs(os.alphas[j] - alpha_old_j) < 0.0001:
+            print('j not moving enough')
+            return 0
+        os.alphas[i] += os.label_matrix[j] * os.label_matrix[i] * (alpha_old_j - os.alphas[j])
+        update_e(os, i)
+        b1 = (-ei - os.label_matrix[i] * (os.alphas[i] - alpha_old_i) * os.data_matrix[i, :] * os.data_matrix[i, :].T
+              - os.label_matrix[j] * (os.alphas[j] - alpha_old_j)
+              * os.data_matrix[i, :] * os.data_matrix[j, :].T + os.b)[0, 0]
+        b2 = (-ej - os.label_matrix[i] * (os.alphas[i] - alpha_old_i) * os.data_matrix[i, :] * os.data_matrix[j, :].T
+              - os.label_matrix[j] * (os.alphas[j] - alpha_old_j)
+              * os.data_matrix[j, :] * os.data_matrix[j, :].T + os.b)[0, 0]
+        if 0 < os.alphas[i] < os.c:
+            os.b = b1
+        elif 0 < os.alphas[j] < os.c:
+            os.b = b2
+        else:
+            os.b = (b1 + b2) / 2.0
+        return 1
+    else:
+        return 0
+
+
+def calc_e(os: OptStruct, j):
+    """
+        计算索引为k对应的E的值
+    """
+
+    fx = float(multiply(os.alphas, os.label_matrix).T * (os.data_matrix * os.data_matrix[j, :].T)) + os.b
+    return fx - float(os.label_matrix[j])
+
+
+def select_j(i, os: OptStruct, ei):
+    """
+        选择内循环的alpha值
+    """
+    max_j = -1
+    max_delta_e = 0
+    max_ej = 0
+
+    os.e_cache[i] = [1, ei]  # 将缓存中的i位置的值设置为有效
+    valid_e_cache_list = nonzero(os.e_cache[:, 0].A)[0]  # .A 表示转换为数组 获取有效的E缓存 有效代表着对应的alpha处于0和C之间
+    if len(valid_e_cache_list) > 1:
+        # 循环选择Ei和Ej差距最大的一个j 因为差距越大代表优化后端变化越大  aj变化和Ei-Ej成正相关
+        for j in valid_e_cache_list:
+            if j == i:
+                continue
+            ej = calc_e(os, j)
+            delta_e = abs(ei - ej)
+            if delta_e > max_delta_e:
+                max_ej = ej
+                max_delta_e = delta_e
+                max_j = j
+        return max_j, max_ej
+    else:
+        # 如果第一次 也就是valid_e_cache_list中都是无效的 就随机选择一个j进行优化
+        j = select_j_rand(i, os.m)
+        ej = calc_e(os, j)
+    return j, ej
+
+
+def update_e(os: OptStruct, j):
+    """
+        更新E值到缓存
+    """
+    ej = calc_e(os, j)
+    os.e_cache[j] = [1, ej]
 
 
 def run():
     data_matrix, label_matrix = load_data_set('testSet.txt')
-    alphas, b = smo_simple(data_matrix, label_matrix, 0.6, 0.001)
+    b, alphas = smo_complete(data_matrix, label_matrix, 0.6, 0.001)
     w = multiply(alphas.T, mat(label_matrix)) * data_matrix
     plot_scatter(array(data_matrix), label_matrix, alphas, b, w)
 
