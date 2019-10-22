@@ -147,18 +147,19 @@ def plot_scatter(data_matrix, label_matrix, alphas, b, w):
             label2_y.append(data_matrix[i, 1])
         # 对支持向量做特别标注
         if alphas[i] > 0:
-            circle = Circle((data_matrix[i, 0], data_matrix[i, 1]), radius=0.5, facecolor='none',
+            circle = Circle((data_matrix[i, 0], data_matrix[i, 1]), radius=0.1, facecolor='none',
                             edgecolor=(0, 0.8, 0.8),
                             linewidth=3, alpha=0.5)
             ax.add_patch(circle)
     ax.scatter(label1_x, label1_y, s=30, c='red', marker='s')
     ax.scatter(label2_x, label2_y, s=30, c='green', marker='o')
-    x = arange(-2.0, 8.0, 0.1)
-    # 通过W·X+b=0得到x1和x2的关系 得出x2也就是y
-    w0 = w[0, 0]
-    w1 = w[0, 1]
-    y = (-b - w0 * x) / w1
-    ax.plot(x, y)
+    if w is not None:
+        x = arange(-2.0, 8.0, 0.1)
+        # 通过W·X+b=0得到x1和x2的关系 得出x2也就是y
+        w0 = w[0, 0]
+        w1 = w[0, 1]
+        y = (-b - w0 * x) / w1
+        ax.plot(x, y)
     pyplot.xlabel('x1')
     pyplot.ylabel('x2')
     pyplot.show()

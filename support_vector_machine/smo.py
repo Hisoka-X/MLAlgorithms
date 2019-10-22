@@ -1,7 +1,7 @@
 """
     序列最小化算法 完整版
 """
-from numpy import shape, multiply, nonzero, mat, array
+from numpy import shape, multiply, nonzero, mat, array, exp, sign
 from numpy.matlib import zeros
 
 from support_vector_machine.smo_simple import select_j_rand, clip_alpha, load_data_set, plot_scatter
@@ -12,7 +12,7 @@ class OptStruct:
         保存重要的值 只是作为一个保存数据的对象
     """
 
-    def __init__(self, data_matrix, labels, c, toler):
+    def __init__(self, data_matrix, labels, c, toler, kernel_type=('none',)):
         self.data_matrix = data_matrix
         self.label_matrix = labels
         self.c = c
@@ -21,13 +21,17 @@ class OptStruct:
         self.alphas = zeros((self.m, 1))
         self.b = 0
         self.e_cache = zeros((self.m, 2))  # 缓存E的值 第一列表示E是否有效 第二列保存对应的值 有效意味着已经计算好了
+        # 初始化核函数的计算结果
+        self.k = mat(zeros((self.m, self.m)))
+        for i in range(self.m):
+            self.k[:, i] = kernel_trans(self.data_matrix, self.data_matrix[i], kernel_type)
 
 
-def smo_complete(data_matrix, labels, c, toler, max_iter=500, ):
+def smo_complete(data_matrix, labels, c, toler, max_iter=500, kernel_type=('none',)):
     """
         完整版smo 序列最小化算法 循环模块
     """
-    os = OptStruct(mat(data_matrix), mat(labels).transpose(), c, toler)
+    os = OptStruct(mat(data_matrix), labels, c, toler, kernel_type)
     iter_times = 0
     alpha_pairs_changed = 0
     entire_set = True  # 表示是否为全alpha遍历
@@ -73,8 +77,7 @@ def inner_l(i, os: OptStruct):
         if limit_l == limit_h:
             print('L==H')
             return 0
-        eta = (os.data_matrix[i, :] * os.data_matrix[i, :].T + os.data_matrix[j, :] * os.data_matrix[j, :].T
-               - 2.0 * os.data_matrix[i, :] * os.data_matrix[j, :].T)
+        eta = os.k[i, i] + os.k[j, j] - 2.0 * os.k[i, j]
         if eta <= 0:
             print('eta<=0')
             return 0
@@ -86,12 +89,10 @@ def inner_l(i, os: OptStruct):
             return 0
         os.alphas[i] += os.label_matrix[j] * os.label_matrix[i] * (alpha_old_j - os.alphas[j])
         update_e(os, i)
-        b1 = (-ei - os.label_matrix[i] * (os.alphas[i] - alpha_old_i) * os.data_matrix[i, :] * os.data_matrix[i, :].T
-              - os.label_matrix[j] * (os.alphas[j] - alpha_old_j)
-              * os.data_matrix[i, :] * os.data_matrix[j, :].T + os.b)[0, 0]
-        b2 = (-ej - os.label_matrix[i] * (os.alphas[i] - alpha_old_i) * os.data_matrix[i, :] * os.data_matrix[j, :].T
-              - os.label_matrix[j] * (os.alphas[j] - alpha_old_j)
-              * os.data_matrix[j, :] * os.data_matrix[j, :].T + os.b)[0, 0]
+        b1 = (-ei - os.label_matrix[i] * (os.alphas[i] - alpha_old_i) * os.k[i, i]
+              - os.label_matrix[j] * (os.alphas[j] - alpha_old_j) * os.k[i, j] + os.b)[0, 0]
+        b2 = (-ej - os.label_matrix[i] * (os.alphas[i] - alpha_old_i) * os.k[i, j]
+              - os.label_matrix[j] * (os.alphas[j] - alpha_old_j) * os.k[j, j] + os.b)[0, 0]
         if 0 < os.alphas[i] < os.c:
             os.b = b1
         elif 0 < os.alphas[j] < os.c:
@@ -108,7 +109,7 @@ def calc_e(os: OptStruct, j):
         计算索引为k对应的E的值
     """
 
-    fx = float(multiply(os.alphas, os.label_matrix).T * (os.data_matrix * os.data_matrix[j, :].T)) + os.b
+    fx = float(multiply(os.alphas, os.label_matrix).T * os.k[:, j]) + os.b
     return fx - float(os.label_matrix[j])
 
 
@@ -149,12 +150,70 @@ def update_e(os: OptStruct, j):
     os.e_cache[j] = [1, ej]
 
 
+def kernel_trans(data_matrix, data_i, kernel_type):
+    """
+        使用核函数转换数据
+    """
+    m = len(data_matrix)
+    k = zeros((m, 1))
+    if kernel_type[0] == 'none':
+        k = data_matrix * data_i.T
+    elif kernel_type[0] == 'rbf':
+        for i in range(m):
+            delta_row = data_matrix[i] - data_i
+            k[i] = -delta_row * delta_row.T
+        k = exp(k / (2 * kernel_type[1] ** 2))
+    else:
+        raise NameError('kernel type only support none or rbf')
+    return k
+
+
 def run():
     data_matrix, label_matrix = load_data_set('testSet.txt')
-    b, alphas = smo_complete(data_matrix, label_matrix, 0.6, 0.001)
+    b, alphas = smo_complete(data_matrix, mat(label_matrix).transpose(), 0.6, 0.001)
     w = multiply(alphas.T, mat(label_matrix)) * data_matrix
     plot_scatter(array(data_matrix), label_matrix, alphas, b, w)
 
 
+def run_with_kernel(reach):
+    """
+        添加核函数功能运行
+    """
+    data_matrix, label_matrix = load_data_set('testSetRBF.txt')
+    data_matrix = mat(data_matrix)
+    label_matrix = mat(label_matrix).T
+    kernel_type = ('rbf', reach)
+    b, alphas = smo_complete(data_matrix, label_matrix, 0.6, 0.001, kernel_type=kernel_type)
+    # alpha大于0的都是支持向量
+    support_vector_index = nonzero(alphas.A > 0)[0]
+    support_matrix = data_matrix[support_vector_index]
+    support_label = label_matrix[support_vector_index]
+    print('there are %d support vectors' % len(support_vector_index))
+
+    # 遍历训练向量 计算出正确率
+    m = shape(data_matrix)[0]
+    error_count = 0
+    for i in range(m):
+        kernel_eval = kernel_trans(support_matrix, data_matrix[i, :], kernel_type)
+        predict = kernel_eval.T * multiply(support_label, alphas[support_vector_index]) + b
+        if sign(predict[0, 0]) != sign(label_matrix[i]):
+            error_count += 1
+    print('the training error rate is %f' % float(error_count / m))
+
+    # 遍历测试向量 计算正确率
+    data_matrix, label_matrix = load_data_set('testSetRBF2.txt')
+    data_matrix = mat(data_matrix)
+    label_matrix = mat(label_matrix).T
+    error_count = 0
+    for i in range(m):
+        kernel_eval = kernel_trans(support_matrix, data_matrix[i, :], kernel_type)
+        predict = kernel_eval.T * multiply(support_label, alphas[support_vector_index]) + b
+        if sign(predict) != sign(label_matrix[i]):
+            error_count += 1
+    print('the test error rate is %f' % float(error_count / m))
+    plot_scatter(array(data_matrix), label_matrix, alphas, b, None)
+
+
 if __name__ == '__main__':
-    run()
+    # run()
+    run_with_kernel(2)
