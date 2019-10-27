@@ -203,6 +203,7 @@ def run_with_kernel(reach):
     # 遍历测试向量 计算正确率
     data_matrix, label_matrix = load_data_set('testSetRBF2.txt')
     data_matrix = mat(data_matrix)
+    m = shape(data_matrix)[0]
     label_matrix = mat(label_matrix).T
     error_count = 0
     for i in range(m):
