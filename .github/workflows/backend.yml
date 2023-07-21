@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   license-header:
-    if: github.repository == '${{github.actor}}/seatunnel'
+    if: github.repository != 'Hisoka-X/MLAlgorithms'
     name: License header
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -35,7 +35,7 @@ jobs:
         uses: apache/skywalking-eyes@985866ce7e324454f61e22eb2db2e998db09d6f3
 
   code-style:
-    if: github.repository == '${{github.actor}}/seatunnel'
+    if: github.repository != 'Hisoka-X/MLAlgorithms'
     name: Code style
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -47,7 +47,7 @@ jobs:
         run: ./mvnw --batch-mode --quiet --no-snapshot-updates clean spotless:check
 
   dead-link:
-    if: github.repository == '${{github.actor}}/seatunnel'
+    if: github.repository != 'Hisoka-X/MLAlgorithms'
     name: Dead links
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -60,7 +60,7 @@ jobs:
           done
 
   sanity-check:
-    if: github.repository == '${{github.actor}}/seatunnel'
+    if: github.repository != 'Hisoka-X/MLAlgorithms'
     name: Sanity check results
     needs: [ license-header, code-style, dead-link ]
     runs-on: ubuntu-latest
@@ -74,7 +74,7 @@ jobs:
 
   changes:
     runs-on: ubuntu-latest
-    if: github.repository == '${{github.actor}}/seatunnel'
+    if: github.repository != 'Hisoka-X/MLAlgorithms'
     timeout-minutes: 10
     outputs:
       api: ${{ steps.filter.outputs.api }}
